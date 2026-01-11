@@ -3,6 +3,8 @@ Live Joint List - Shows all 26 OpenXR hand joints with XYZ values
 """
 import argparse
 import csv
+import json
+import os
 import threading
 import tkinter as tk
 from tkinter import filedialog, messagebox
@@ -14,80 +16,20 @@ from matplotlib.widgets import Button
 from pythonosc import dispatcher
 from pythonosc import osc_server
 
-# Base hand skeleton positions (forms a hand shape for 3D visualization)
-BASE_HAND_POSITIONS = np.array([
-    [0.0, 0.0, 0.0],      # 0: Palm
-    [0.0, -0.08, 0.0],    # 1: Wrist
-    [-0.08, 0.04, 0.04],  # 2: Thumb metacarpal
-    [-0.14, 0.08, 0.06],  # 3: Thumb proximal
-    [-0.18, 0.12, 0.07],  # 4: Thumb distal
-    [-0.22, 0.16, 0.08],  # 5: Thumb tip
-    [-0.04, 0.08, 0.0],   # 6: Index metacarpal
-    [-0.05, 0.18, 0.0],   # 7: Index proximal
-    [-0.05, 0.26, 0.0],   # 8: Index intermediate
-    [-0.05, 0.32, 0.0],   # 9: Index distal
-    [-0.05, 0.38, 0.0],   # 10: Index tip
-    [0.0, 0.08, 0.0],     # 11: Middle metacarpal
-    [0.0, 0.20, 0.0],     # 12: Middle proximal
-    [0.0, 0.28, 0.0],     # 13: Middle intermediate
-    [0.0, 0.34, 0.0],     # 14: Middle distal
-    [0.0, 0.42, 0.0],     # 15: Middle tip
-    [0.04, 0.08, 0.0],    # 16: Ring metacarpal
-    [0.05, 0.18, 0.0],    # 17: Ring proximal
-    [0.05, 0.25, 0.0],    # 18: Ring intermediate
-    [0.05, 0.30, 0.0],    # 19: Ring distal
-    [0.05, 0.36, 0.0],    # 20: Ring tip
-    [0.08, 0.07, 0.0],    # 21: Little metacarpal
-    [0.10, 0.14, 0.0],    # 22: Little proximal
-    [0.10, 0.20, 0.0],    # 23: Little intermediate
-    [0.10, 0.24, 0.0],    # 24: Little distal
-    [0.10, 0.28, 0.0],    # 25: Little tip
-])
-
-# Finger connections for drawing skeleton lines
-FINGER_CONNECTIONS = [
-    [1, 2, 3, 4, 5],       # Thumb: wrist -> tip
-    [1, 6, 7, 8, 9, 10],   # Index
-    [1, 11, 12, 13, 14, 15], # Middle
-    [1, 16, 17, 18, 19, 20], # Ring
-    [1, 21, 22, 23, 24, 25], # Little
-    [0, 1],                 # Palm to wrist
-]
-
-
 # ─────────────────────────────────────────────────────────────────────────────
-# OpenXR Hand Joint Names (26 joints, exact order)
+# Load hand configuration from external JSON file
 # ─────────────────────────────────────────────────────────────────────────────
-JOINT_NAMES = [
-    "Palm",
-    "Wrist",
-    "Thumb metacarpal",
-    "Thumb proximal",
-    "Thumb distal",
-    "Thumb tip",
-    "Index metacarpal",
-    "Index proximal",
-    "Index intermediate",
-    "Index distal",
-    "Index tip",
-    "Middle metacarpal",
-    "Middle proximal",
-    "Middle intermediate",
-    "Middle distal",
-    "Middle tip",
-    "Ring metacarpal",
-    "Ring proximal",
-    "Ring intermediate",
-    "Ring distal",
-    "Ring tip",
-    "Little metacarpal",
-    "Little proximal",
-    "Little intermediate",
-    "Little distal",
-    "Little tip",
-]
+def _load_hand_config():
+    config_path = os.path.join(os.path.dirname(__file__), "hand_config.json")
+    with open(config_path, 'r') as f:
+        config = json.load(f)
+    return config
 
-NUM_JOINTS = 26
+_config = _load_hand_config()
+BASE_HAND_POSITIONS = np.array(_config["base_hand_positions"])
+FINGER_CONNECTIONS = _config["finger_connections"]
+JOINT_NAMES = _config["joint_names"]
+NUM_JOINTS = len(JOINT_NAMES)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
