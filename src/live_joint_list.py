@@ -6,10 +6,12 @@ import csv
 import json
 import os
 import threading
+import time
 import tkinter as tk
 from tkinter import filedialog, messagebox
 from datetime import datetime
 import numpy as np
+from scipy.spatial.transform import Rotation
 import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation
 from matplotlib.widgets import Button
@@ -36,40 +38,90 @@ NUM_JOINTS = len(JOINT_NAMES)
 # Shared State
 # ─────────────────────────────────────────────────────────────────────────────
 class HandState:
-    def __init__(self):
+    def __init__(self, smoothing_factor: float = 0.3):
         self.lock = threading.Lock()
-        self.rotations = np.zeros((NUM_JOINTS, 3))  # Quaternion xyz for joint list display
+        self.quaternions = np.zeros((NUM_JOINTS, 4))  # Full quaternion (w, x, y, z)
+        self.euler_angles = np.zeros((NUM_JOINTS, 3))  # Euler angles in degrees
         self.positions = np.zeros((NUM_JOINTS, 3))  # XYZ positions for 3D visualization
         self.device_name = ""
         self.packet_count = 0
+        self.dropped_packets = 0
         self.has_data = False
         self.calibrated = False
-        self.rotation_offset = np.zeros((NUM_JOINTS, 3))
+        self.calibration_quaternions = np.zeros((NUM_JOINTS, 4))
+        self.last_update_time = 0.0
+        self.smoothing_factor = smoothing_factor  # 0 = no smoothing, 1 = max smoothing
+        self._prev_positions = np.zeros((NUM_JOINTS, 3))
+        self._prev_euler = np.zeros((NUM_JOINTS, 3))
 
-    def update(self, device_name: str, rotations: np.ndarray, positions: np.ndarray):
+    def update(self, device_name: str, quaternions: np.ndarray, positions: np.ndarray):
         with self.lock:
+            current_time = time.time()
+            
+            # Detect dropped packets (gap > 50ms suggests missed frames at 60Hz)
+            if self.last_update_time > 0:
+                time_gap = current_time - self.last_update_time
+                if time_gap > 0.05:  # 50ms
+                    estimated_dropped = int(time_gap / 0.0167) - 1  # ~60Hz expected
+                    self.dropped_packets += max(0, estimated_dropped)
+            
+            self.last_update_time = current_time
+            
+            # Store calibration pose on first data
             if not self.calibrated:
-                self.rotation_offset = rotations.copy()
+                self.calibration_quaternions = quaternions.copy()
                 self.calibrated = True
+            
             self.device_name = device_name
-            self.rotations = rotations - self.rotation_offset
+            self.quaternions = quaternions.copy()
+            
+            # Convert quaternions to Euler angles for display
+            euler_angles = np.zeros((NUM_JOINTS, 3))
+            for i in range(NUM_JOINTS):
+                try:
+                    # Quaternion order: w, x, y, z -> scipy expects x, y, z, w
+                    q = quaternions[i]
+                    rot = Rotation.from_quat([q[1], q[2], q[3], q[0]])  # xyzw format
+                    # Apply calibration offset
+                    q_cal = self.calibration_quaternions[i]
+                    rot_cal = Rotation.from_quat([q_cal[1], q_cal[2], q_cal[3], q_cal[0]])
+                    rot_relative = rot_cal.inv() * rot
+                    euler_angles[i] = rot_relative.as_euler('xyz', degrees=True)
+                except Exception:
+                    euler_angles[i] = self._prev_euler[i]
+            
+            # Apply exponential smoothing for noise reduction
+            if self.has_data and self.smoothing_factor > 0:
+                alpha = 1.0 - self.smoothing_factor
+                positions = alpha * positions + self.smoothing_factor * self._prev_positions
+                euler_angles = alpha * euler_angles + self.smoothing_factor * self._prev_euler
+            
+            self._prev_positions = positions.copy()
+            self._prev_euler = euler_angles.copy()
             self.positions = positions
+            self.euler_angles = euler_angles
             self.packet_count += 1
             self.has_data = True
 
     def reset_calibration(self):
         with self.lock:
             self.calibrated = False
-            self.rotations = np.zeros((NUM_JOINTS, 3))
+            self.euler_angles = np.zeros((NUM_JOINTS, 3))
+            self.quaternions = np.zeros((NUM_JOINTS, 4))
 
     def get(self):
         with self.lock:
+            data_age = time.time() - self.last_update_time if self.last_update_time > 0 else float('inf')
             return {
-                "rotations": self.rotations.copy(),
+                "quaternions": self.quaternions.copy(),
+                "rotations": self.euler_angles.copy(),  # Keep 'rotations' key for compatibility
                 "positions": self.positions.copy(),
                 "device_name": self.device_name,
                 "packet_count": self.packet_count,
-                "has_data": self.has_data
+                "dropped_packets": self.dropped_packets,
+                "has_data": self.has_data,
+                "data_age_ms": data_age * 1000,
+                "is_stale": data_age > 0.1  # Data older than 100ms is stale
             }
 
 
@@ -94,31 +146,33 @@ def default_handler(address: str, *args):
         values_per_joint = 7  # x, y, z, qw, qx, qy, qz
         
         positions = np.zeros((NUM_JOINTS, 3))
-        rotations = np.zeros((NUM_JOINTS, 3))
+        quaternions = np.zeros((NUM_JOINTS, 4))  # Full quaternion: w, x, y, z
+        
         for i in range(NUM_JOINTS):
             base = i * values_per_joint
             # Get XYZ position data (indices 0,1,2) for 3D visualization
             positions[i, 0] = float(joint_data[base + 0])
             positions[i, 1] = float(joint_data[base + 1])
             positions[i, 2] = float(joint_data[base + 2])
-            # Get quaternion xyz (indices 4,5,6) for joint rotation display
-            rotations[i, 0] = float(joint_data[base + 4])
-            rotations[i, 1] = float(joint_data[base + 5])
-            rotations[i, 2] = float(joint_data[base + 6])
+            # Get FULL quaternion (w, x, y, z) for proper rotation handling
+            quaternions[i, 0] = float(joint_data[base + 3])  # qw
+            quaternions[i, 1] = float(joint_data[base + 4])  # qx
+            quaternions[i, 2] = float(joint_data[base + 5])  # qy
+            quaternions[i, 3] = float(joint_data[base + 6])  # qz
         
         # Tip joints (5,10,15,20,25) don't have independent rotation - inherit from parent (distal) joint
-        rotations[5] = rotations[4]    # Thumb tip <- Thumb distal
-        rotations[10] = rotations[9]   # Index tip <- Index distal
-        rotations[15] = rotations[14]  # Middle tip <- Middle distal
-        rotations[20] = rotations[19]  # Ring tip <- Ring distal
-        rotations[25] = rotations[24]  # Little tip <- Little distal
+        quaternions[5] = quaternions[4]    # Thumb tip <- Thumb distal
+        quaternions[10] = quaternions[9]   # Index tip <- Index distal
+        quaternions[15] = quaternions[14]  # Middle tip <- Middle distal
+        quaternions[20] = quaternions[19]  # Ring tip <- Ring distal
+        quaternions[25] = quaternions[24]  # Little tip <- Little distal
         
         # Route to correct hand based on device name
         # Device names are "Reality Glove (L)" and "Reality Glove (R)"
         if "(l)" in device_name or "left" in device_name:
-            left_state.update(device_name, rotations, positions)
+            left_state.update(device_name, quaternions, positions)
         else:
-            right_state.update(device_name, rotations, positions)
+            right_state.update(device_name, quaternions, positions)
     except Exception as e:
         print(f"[Error] {e}")
 
@@ -596,7 +650,23 @@ class JointListGUI:
                 self.right_labels[i][1].config(text=f"{y:+.3f}")
                 self.right_labels[i][2].config(text=f"{z:+.3f}")
         
-        self.status_label.config(text=f"Packets: L={left_data['packet_count']} R={right_data['packet_count']}")
+        # Build status with packet counts, dropped packets, and data freshness
+        l_status = f"L={left_data['packet_count']}"
+        r_status = f"R={right_data['packet_count']}"
+        
+        if left_data.get('dropped_packets', 0) > 0:
+            l_status += f" (drop:{left_data['dropped_packets']})"
+        if right_data.get('dropped_packets', 0) > 0:
+            r_status += f" (drop:{right_data['dropped_packets']})"
+        
+        # Show data age warning if stale
+        stale_warning = ""
+        if left_data.get('is_stale') and left_data['has_data']:
+            stale_warning += " [L:STALE]"
+        if right_data.get('is_stale') and right_data['has_data']:
+            stale_warning += " [R:STALE]"
+        
+        self.status_label.config(text=f"Packets: {l_status} {r_status}{stale_warning}")
         self.root.after(50, self._update)
 
 

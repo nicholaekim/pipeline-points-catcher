@@ -143,10 +143,61 @@ The 3D view displays:
 OSC data per joint: `X, Y, Z, qW, qX, qY, qZ`
 - Position (X, Y, Z) and quaternion rotation (qW, qX, qY, qZ)
 
+## APIs & Protocols
+
+### StretchSense Open SDK
+
+This application uses the **StretchSense Open SDK**, which is the official API for accessing real-time hand tracking data from StretchSense gloves. Key features:
+
+- **Protocol**: Built on OSC (Open Sound Control)
+- **Transport**: UDP packets
+- **Default Ports**: 9000-9005
+- **Data Rate**: ~60 Hz
+
+The Open SDK is a lightweight, cross-platform solution that streams hand pose data without requiring game engine integration.
+
+### OSC (Open Sound Control)
+
+OSC is the underlying transport protocol used by the StretchSense Open SDK:
+
+- **Message Address**: `/kinematic`
+- **Payload Structure**: 5 header values + 26 joints × 7 floats
+- **Per-Joint Data**: `[x, y, z, qw, qx, qy, qz]`
+  - `x, y, z` — 3D position (meters)
+  - `qw, qx, qy, qz` — Rotation quaternion
+
+### Data Pipeline
+
+```
+StretchSense Gloves (Hardware)
+        │
+        ▼ Bluetooth/USB
+XR Trainer Application
+        │
+        ▼ OSC/UDP (StretchSense Open SDK)
+Python Code (this application)
+        │
+        ▼
+GUI Display / 3D Visualization / CSV Export
+```
+
+### Python Libraries Used
+
+| Library | Purpose |
+|---------|---------|
+| `python-osc` | Receives OSC messages from XR Trainer |
+| `scipy` | Quaternion to Euler angle conversion |
+| `numpy` | Numerical array operations |
+| `matplotlib` | 3D visualization and animation |
+| `tkinter` | GUI framework |
+
+---
+
 ## Requirements
 
 - Python 3.x
 - numpy
 - matplotlib
 - python-osc
+- scipy
 - tkinter (included with Python)
