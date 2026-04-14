@@ -125,8 +125,8 @@ class HandState:
             }
 
 
-left_state = HandState()
-right_state = HandState()
+left_state = HandState(smoothing_factor=0.0)   # DEBUG: smoothing disabled
+right_state = HandState(smoothing_factor=0.0)  # DEBUG: smoothing disabled
 
 
 # ─────────────────────────────────────────────────────────────────────────────
