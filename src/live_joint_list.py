@@ -128,6 +128,8 @@ class HandState:
 left_state = HandState(smoothing_factor=0.0)   # DEBUG: smoothing disabled
 right_state = HandState(smoothing_factor=0.0)  # DEBUG: smoothing disabled
 
+_logged_devices: set = set()  # tracks devices seen at least once for header logging
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 # OSC Handler
@@ -138,10 +140,15 @@ def default_handler(address: str, *args):
         return
     
     if len(args) < 187:  # 5 header + 26*7 joint values
+        print(f"[Debug] Rejected short packet on {address} ({len(args)} args) | header: {args[:5]}")
         return
     
     try:
+        header = args[:5]
         device_name = str(args[3]).lower()
+        if device_name not in _logged_devices:
+            print(f"[Debug] First packet from '{device_name}' | header: {header}")
+            _logged_devices.add(device_name)
         joint_data = args[5:]
         values_per_joint = 7  # x, y, z, qw, qx, qy, qz
         
@@ -174,7 +181,7 @@ def default_handler(address: str, *args):
         elif "(r)" in device_name or "right" in device_name:
             right_state.update(device_name, quaternions, positions)
         else:
-            print(f"[Warning] Unrecognised device name, skipping update: '{device_name}'")
+            print(f"[Warning] Unrecognised device name, skipping update: '{device_name}' | header: {header}")
     except Exception as e:
         print(f"[Error] {e}")
 
