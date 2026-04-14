@@ -495,13 +495,13 @@ class JointListGUI:
             self.live_3d_ax_left.clear()
             self.live_3d_ax_left.set_title('Left Hand', fontsize=12, fontweight='bold', color='#ff9966')
             if left_data['has_data']:
-                self._draw_skeleton_3d(self.live_3d_ax_left, left_data['rotations'], 'green')
+                self._draw_skeleton_3d(self.live_3d_ax_left, left_data['positions'], 'green')
             
             # Draw right hand
             self.live_3d_ax_right.clear()
             self.live_3d_ax_right.set_title('Right Hand', fontsize=12, fontweight='bold', color='#66ccff')
             if right_data['has_data']:
-                self._draw_skeleton_3d(self.live_3d_ax_right, right_data['rotations'], 'blue')
+                self._draw_skeleton_3d(self.live_3d_ax_right, right_data['positions'], 'blue')
             
             return []
         
@@ -521,34 +521,32 @@ class JointListGUI:
         plt.tight_layout(rect=[0, 0.08, 1, 1])
         plt.show(block=False)
     
-    def _draw_skeleton_3d(self, ax, rotations, color):
-        """Draw 3D hand skeleton on given axes."""
-        # Use base hand shape + rotation offsets for visualization
-        movement_scale = 0.3
-        display_positions = BASE_HAND_POSITIONS + (rotations * movement_scale)
-        
+    def _draw_skeleton_3d(self, ax, positions, color):
+        """Draw 3D hand skeleton on given axes using raw XYZ positions."""
         # Plot joints as red dots
-        ax.scatter(display_positions[:, 0], display_positions[:, 1], display_positions[:, 2], 
+        ax.scatter(positions[:, 0], positions[:, 1], positions[:, 2],
                   c='red', s=50, depthshade=True)
         
         # Add joint index labels
         for i in range(NUM_JOINTS):
-            ax.text(display_positions[i, 0], display_positions[i, 1], display_positions[i, 2], 
+            ax.text(positions[i, 0], positions[i, 1], positions[i, 2],
                    str(i), fontsize=8, color='darkred')
         
-        # Draw finger connections as green lines
+        # Draw finger connections
         for finger in FINGER_CONNECTIONS:
             for j in range(len(finger) - 1):
                 idx1, idx2 = finger[j], finger[j + 1]
-                ax.plot([display_positions[idx1, 0], display_positions[idx2, 0]],
-                       [display_positions[idx1, 1], display_positions[idx2, 1]],
-                       [display_positions[idx1, 2], display_positions[idx2, 2]],
+                ax.plot([positions[idx1, 0], positions[idx2, 0]],
+                       [positions[idx1, 1], positions[idx2, 1]],
+                       [positions[idx1, 2], positions[idx2, 2]],
                        color=color, linewidth=2)
         
-        # Set fixed axis limits for stable view
-        ax.set_xlim([-0.35, 0.25])
-        ax.set_ylim([-0.15, 0.5])
-        ax.set_zlim([-0.2, 0.2])
+        # Fit axis limits to actual data with a small margin
+        margin = 0.05
+        for setter, col in [(ax.set_xlim, 0), (ax.set_ylim, 1), (ax.set_zlim, 2)]:
+            lo = positions[:, col].min() - margin
+            hi = positions[:, col].max() + margin
+            setter([lo, hi])
         ax.set_xlabel('X')
         ax.set_ylabel('Y')
         ax.set_zlabel('Z')
