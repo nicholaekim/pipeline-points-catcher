@@ -34,6 +34,11 @@ JOINT_NAMES = _config["joint_names"]
 NUM_JOINTS = len(JOINT_NAMES)
 
 
+# ─── DEBUG ───────────────────────────────────────────────────────────────────
+DEBUG_FAKE_DATA = False  # set True to test GUI without gloves; remove before release
+# ─────────────────────────────────────────────────────────────────────────────
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # Shared State
 # ─────────────────────────────────────────────────────────────────────────────
@@ -129,6 +134,24 @@ left_state = HandState(smoothing_factor=0.0)   # DEBUG: smoothing disabled
 right_state = HandState(smoothing_factor=0.0)  # DEBUG: smoothing disabled
 
 _logged_devices: set = set()  # tracks devices seen at least once for header logging
+
+
+# ─── DEBUG ───────────────────────────────────────────────────────────────────
+def _fake_data_thread():
+    """DEBUG: pumps synthetic joint data into both hand states for GUI testing."""
+    t = 0.0
+    while True:
+        positions_left = BASE_HAND_POSITIONS.copy()
+        positions_left[:, 1] += np.sin(t) * 0.02        # gentle Y wiggle
+        positions_left[:, 2] += np.cos(t * 0.7) * 0.01  # gentle Z wiggle
+        positions_right = positions_left + np.array([0.25, 0.0, 0.0])
+        quaternions = np.zeros((NUM_JOINTS, 4))
+        quaternions[:, 0] = 1.0  # identity quaternion (w=1, xyz=0)
+        left_state.update("debug left", quaternions, positions_left)
+        right_state.update("debug right", quaternions, positions_right)
+        t += 0.05
+        time.sleep(1 / 60)
+# ─────────────────────────────────────────────────────────────────────────────
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -715,12 +738,17 @@ def main():
     # Try common OSC ports for StretchSense gloves
     ports = [9000, 9001, 9002, 9003, 9004, 9005]
     
-    osc_thread = threading.Thread(
-        target=start_multi_osc_servers, 
-        args=(args.host, ports), 
-        daemon=True
-    )
-    osc_thread.start()
+    if DEBUG_FAKE_DATA:
+        print("[DEBUG] Fake data mode enabled — OSC servers not started")
+        fake_thread = threading.Thread(target=_fake_data_thread, daemon=True)
+        fake_thread.start()
+    else:
+        osc_thread = threading.Thread(
+            target=start_multi_osc_servers,
+            args=(args.host, ports),
+            daemon=True
+        )
+        osc_thread.start()
 
     root = tk.Tk()
     app = JointListGUI(root)
