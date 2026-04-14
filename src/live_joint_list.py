@@ -637,7 +637,7 @@ class JointListGUI:
         if left_data['has_data']:
             self.left_device_label.config(text=f"Left: {left_data['device_name']}")
             for i in range(NUM_JOINTS):
-                x, y, z = left_data['rotations'][i]
+                x, y, z = left_data['positions'][i]
                 self.left_labels[i][0].config(text=f"{x:+.3f}")
                 self.left_labels[i][1].config(text=f"{y:+.3f}")
                 self.left_labels[i][2].config(text=f"{z:+.3f}")
@@ -645,7 +645,7 @@ class JointListGUI:
         if right_data['has_data']:
             self.right_device_label.config(text=f"Right: {right_data['device_name']}")
             for i in range(NUM_JOINTS):
-                x, y, z = right_data['rotations'][i]
+                x, y, z = right_data['positions'][i]
                 self.right_labels[i][0].config(text=f"{x:+.3f}")
                 self.right_labels[i][1].config(text=f"{y:+.3f}")
                 self.right_labels[i][2].config(text=f"{z:+.3f}")
