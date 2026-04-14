@@ -421,38 +421,36 @@ class JointListGUI:
             ax.clear()
             ax.set_title(title, fontsize=12, fontweight='bold')
             
-            # Use base hand shape + rotation offsets for visualization
-            movement_scale = 0.3
-            display_positions = BASE_HAND_POSITIONS + (positions * movement_scale)
-            
             # Plot joints
-            ax.scatter(display_positions[:, 0], display_positions[:, 1], display_positions[:, 2], 
+            ax.scatter(positions[:, 0], positions[:, 1], positions[:, 2],
                       c='red', s=50, depthshade=True)
             
             # Add joint labels
             for i in range(NUM_JOINTS):
-                ax.text(display_positions[i, 0], display_positions[i, 1], display_positions[i, 2], 
+                ax.text(positions[i, 0], positions[i, 1], positions[i, 2],
                        str(i), fontsize=8, color='darkred')
             
             # Draw skeleton connections
             for finger in FINGER_CONNECTIONS:
                 for j in range(len(finger) - 1):
                     idx1, idx2 = finger[j], finger[j + 1]
-                    ax.plot([display_positions[idx1, 0], display_positions[idx2, 0]],
-                           [display_positions[idx1, 1], display_positions[idx2, 1]],
-                           [display_positions[idx1, 2], display_positions[idx2, 2]],
+                    ax.plot([positions[idx1, 0], positions[idx2, 0]],
+                           [positions[idx1, 1], positions[idx2, 1]],
+                           [positions[idx1, 2], positions[idx2, 2]],
                            color=color, linewidth=2)
             
-            # Set fixed axis limits for stable view
-            ax.set_xlim([-0.35, 0.25])
-            ax.set_ylim([-0.15, 0.5])
-            ax.set_zlim([-0.2, 0.2])
+            # Fit axis limits to actual data with a small margin
+            margin = 0.05
+            for setter, col in [(ax.set_xlim, 0), (ax.set_ylim, 1), (ax.set_zlim, 2)]:
+                lo = positions[:, col].min() - margin
+                hi = positions[:, col].max() + margin
+                setter([lo, hi])
             ax.set_xlabel('X')
             ax.set_ylabel('Y')
             ax.set_zlabel('Z')
         
         def animate(frame_idx):
-            left_pos, right_pos = self.recorded_frames[frame_idx]
+            left_pos, right_pos, _, _ = self.recorded_frames[frame_idx]
             draw_hand_skeleton(ax_left, left_pos, 'green', 'Left Hand')
             draw_hand_skeleton(ax_right, right_pos, 'blue', 'Right Hand')
             fig.suptitle(f'Hand Movement Animation - Frame {frame_idx + 1}/{len(self.recorded_frames)}', 
