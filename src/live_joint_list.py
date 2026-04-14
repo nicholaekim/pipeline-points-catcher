@@ -1,6 +1,3 @@
-"""
-Live Joint List - Shows all 26 OpenXR hand joints with XYZ values
-"""
 import argparse
 import csv
 import json
@@ -18,9 +15,7 @@ from matplotlib.widgets import Button
 from pythonosc import dispatcher
 from pythonosc import osc_server
 
-# ─────────────────────────────────────────────────────────────────────────────
 # Load hand configuration from external JSON file
-# ─────────────────────────────────────────────────────────────────────────────
 def _load_hand_config():
     config_path = os.path.join(os.path.dirname(__file__), "hand_config.json")
     with open(config_path, 'r') as f:
@@ -34,14 +29,13 @@ JOINT_NAMES = _config["joint_names"]
 NUM_JOINTS = len(JOINT_NAMES)
 
 
-# ─── DEBUG ───────────────────────────────────────────────────────────────────
+# DEBUG 
 DEBUG_FAKE_DATA = False  # set True to test GUI without gloves; remove before release
-# ─────────────────────────────────────────────────────────────────────────────
 
 
-# ─────────────────────────────────────────────────────────────────────────────
+
 # Shared State
-# ─────────────────────────────────────────────────────────────────────────────
+
 class HandState:
     def __init__(self, smoothing_factor: float = 0.3):
         self.lock = threading.Lock()
@@ -136,7 +130,7 @@ right_state = HandState(smoothing_factor=0.0)  # DEBUG: smoothing disabled
 _logged_devices: set = set()  # tracks devices seen at least once for header logging
 
 
-# ─── DEBUG ───────────────────────────────────────────────────────────────────
+# DEBUG 
 def _fake_data_thread():
     """DEBUG: pumps synthetic joint data into both hand states for GUI testing."""
     t = 0.0
@@ -151,12 +145,11 @@ def _fake_data_thread():
         right_state.update("debug right", quaternions, positions_right)
         t += 0.05
         time.sleep(1 / 60)
-# ─────────────────────────────────────────────────────────────────────────────
 
 
-# ─────────────────────────────────────────────────────────────────────────────
+
+
 # OSC Handler
-# ─────────────────────────────────────────────────────────────────────────────
 def default_handler(address: str, *args):
     # Only process kinematic data (has 26 joints)
     if "/kinematic" not in address.lower():
@@ -208,10 +201,7 @@ def default_handler(address: str, *args):
     except Exception as e:
         print(f"[Error] {e}")
 
-
-# ─────────────────────────────────────────────────────────────────────────────
 # GUI
-# ─────────────────────────────────────────────────────────────────────────────
 class JointListGUI:
     def __init__(self, root: tk.Tk):
         self.root = root
@@ -345,7 +335,7 @@ class JointListGUI:
         
         # Recording state
         self.recording = False
-        self.recorded_frames = []  # List of (left_pos, right_pos) tuples
+        self.recorded_frames = []  # List of (left_pos, right_pos, left_quats, right_quats) 4-tuples
         
         self.record_btn = tk.Button(btn_frame, text="Record", 
                               font=("Consolas", 10), fg="#fff", bg="#8b0000",
@@ -753,9 +743,7 @@ class JointListGUI:
         self.root.after(50, self._update)
 
 
-# ─────────────────────────────────────────────────────────────────────────────
 # Main
-# ─────────────────────────────────────────────────────────────────────────────
 def start_multi_osc_servers(host: str, ports: list):
     """Start OSC servers on multiple ports."""
     disp = dispatcher.Dispatcher()
