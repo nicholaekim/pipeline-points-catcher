@@ -119,7 +119,7 @@ class HandState:
             data_age = time.time() - self.last_update_time if self.last_update_time > 0 else float('inf')
             return {
                 "quaternions": self.quaternions.copy(),
-                "rotations": self.euler_angles.copy(),  # Keep 'rotations' key for compatibility
+                "euler_angles": self.euler_angles.copy(),
                 "positions": self.positions.copy(),
                 "device_name": self.device_name,
                 "packet_count": self.packet_count,
