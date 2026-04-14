@@ -171,8 +171,10 @@ def default_handler(address: str, *args):
         # Device names are "Reality Glove (L)" and "Reality Glove (R)"
         if "(l)" in device_name or "left" in device_name:
             left_state.update(device_name, quaternions, positions)
-        else:
+        elif "(r)" in device_name or "right" in device_name:
             right_state.update(device_name, quaternions, positions)
+        else:
+            print(f"[Warning] Unrecognised device name, skipping update: '{device_name}'")
     except Exception as e:
         print(f"[Error] {e}")
 
