@@ -489,7 +489,12 @@ class JointListGUI:
             
             # Record frame if recording
             if self.recording:
-                self.recorded_frames.append((left_data['rotations'].copy(), right_data['rotations'].copy()))
+                self.recorded_frames.append((
+                    left_data['positions'].copy(),
+                    right_data['positions'].copy(),
+                    left_data['quaternions'].copy(),
+                    right_data['quaternions'].copy(),
+                ))
             
             # Draw left hand
             self.live_3d_ax_left.clear()
