@@ -332,6 +332,11 @@ class JointListGUI:
                               font=("Consolas", 10), fg="#fff", bg="#2a6e2a",
                               command=self._export_csv, width=12)
         export_btn.pack(side=tk.LEFT, padx=5)
+
+        snapshot_btn = tk.Button(btn_frame, text="Raw Snapshot",
+                                 font=("Consolas", 10), fg="#fff", bg="#6e5a2a",
+                                 command=self._export_json_snapshot, width=12)
+        snapshot_btn.pack(side=tk.LEFT, padx=5)
         
         live_3d_btn = tk.Button(btn_frame, text="Live 3D View", 
                               font=("Consolas", 10), fg="#fff", bg="#6a2a6e",
@@ -422,6 +427,51 @@ class JointListGUI:
             print(f"[Export] Saved both hand poses to {filepath}")
         except Exception as e:
             messagebox.showerror("Error", f"Failed to export:\n{e}")
+
+    def _export_json_snapshot(self):
+        """Save a raw snapshot of current hand state (positions + quaternions) to JSON."""
+        left_data = left_state.get()
+        right_data = right_state.get()
+
+        if not left_data['has_data'] and not right_data['has_data']:
+            messagebox.showwarning("No Data", "No hand data available to snapshot.")
+            return
+
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        default_filename = f"snapshot_{timestamp}.json"
+
+        filepath = filedialog.asksaveasfilename(
+            defaultextension=".json",
+            filetypes=[("JSON files", "*.json"), ("All files", "*.*")],
+            initialfile=default_filename,
+            title="Save Raw Snapshot"
+        )
+
+        if not filepath:
+            return
+
+        try:
+            snapshot = {
+                "timestamp": datetime.now().isoformat(),
+                "left": {
+                    "device_name": left_data['device_name'],
+                    "has_data": left_data['has_data'],
+                    "positions": left_data['positions'].tolist(),
+                    "quaternions": left_data['quaternions'].tolist(),
+                },
+                "right": {
+                    "device_name": right_data['device_name'],
+                    "has_data": right_data['has_data'],
+                    "positions": right_data['positions'].tolist(),
+                    "quaternions": right_data['quaternions'].tolist(),
+                },
+            }
+            with open(filepath, 'w') as f:
+                json.dump(snapshot, f, indent=2)
+            messagebox.showinfo("Saved", f"Snapshot saved to:\n{filepath}")
+            print(f"[Snapshot] Saved raw snapshot to {filepath}")
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to save snapshot:\n{e}")
 
     def _toggle_recording(self):
         """Toggle recording of hand movement frames."""
