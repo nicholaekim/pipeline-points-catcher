@@ -160,12 +160,12 @@ def default_handler(address: str, *args):
             quaternions[i, 2] = float(joint_data[base + 5])  # qy
             quaternions[i, 3] = float(joint_data[base + 6])  # qz
         
-        # Tip joints (5,10,15,20,25) don't have independent rotation - inherit from parent (distal) joint
-        quaternions[5] = quaternions[4]    # Thumb tip <- Thumb distal
-        quaternions[10] = quaternions[9]   # Index tip <- Index distal
-        quaternions[15] = quaternions[14]  # Middle tip <- Middle distal
-        quaternions[20] = quaternions[19]  # Ring tip <- Ring distal
-        quaternions[25] = quaternions[24]  # Little tip <- Little distal
+        # DEBUG: preserving raw tip quaternions as received from device (override disabled)
+        # quaternions[5] = quaternions[4]    # Thumb tip <- Thumb distal
+        # quaternions[10] = quaternions[9]   # Index tip <- Index distal
+        # quaternions[15] = quaternions[14]  # Middle tip <- Middle distal
+        # quaternions[20] = quaternions[19]  # Ring tip <- Ring distal
+        # quaternions[25] = quaternions[24]  # Little tip <- Little distal
         
         # Route to correct hand based on device name
         # Device names are "Reality Glove (L)" and "Reality Glove (R)"
